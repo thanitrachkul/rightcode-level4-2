@@ -1,0 +1,472 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RightCode Game Level 4: เรียงตัวเลข</title>
+    
+    <!-- Tailwind CSS --><script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Google Fonts (Kanit & Inter) --><link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Kanit:wght@400;500;600;700&display=swap" rel="stylesheet">
+    
+    <style>
+        /* ใช้ฟอนต์ Kanit สำหรับภาษาไทย และ Inter สำหรับภาษาอังกฤษ */
+        body {
+            font-family: 'Kanit', 'Inter', sans-serif;
+            background-color: #f3f4f6; /* bg-gray-100 */
+        }
+
+        /* --- Jigsaw Grid (กระดานปริศนา) --- */
+        .jigsaw-grid-container {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            grid-template-rows: repeat(4, 1fr);
+            width: 400px;
+            height: 400px;
+            border: 4px solid #9ca3af; /* border-gray-400 */
+            background-color: #e5e7eb; /* bg-gray-200 */
+            border-radius: 0.5rem; /* rounded-lg */
+            box-shadow: 0 10px 20px rgba(0,0,0,0.1);
+        }
+        
+        /* --- Example Grid (ภาพตัวอย่าง) --- */
+        /* (ปรับแก้) เปลี่ยนเป็นกล่องอธิบายเป้าหมาย */
+        #goal-description {
+            width: 240px;
+            border-radius: 0.5rem; /* rounded-lg */
+            border: 4px solid #fff;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.15);
+        }
+
+        @media (max-width: 640px) {
+            .jigsaw-grid-container {
+                width: 320px;
+                height: 320px;
+            }
+            #goal-description {
+                width: 200px;
+            }
+        }
+
+        /* --- Jigsaw Piece (ชิ้นส่วน) --- */
+        .jigsaw-piece {
+            width: 100%;
+            height: 100%;
+            /* (ลบ) ไม่ใช้ background-image/size แล้ว */
+            border: 1px solid #d1d5db; /* border-gray-300 */
+            transition: all 0.2s ease-in-out;
+            cursor: grab;
+            position: relative;
+            outline: 4px solid transparent;
+            outline-offset: -4px;
+            
+            /* (เพิ่ม) สไตล์สำหรับตัวเลข */
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 2.5rem;
+            font-weight: 700;
+            color: white;
+            text-shadow: 0 1px 3px rgba(0,0,0,0.3);
+            user-select: none; /* ป้องกันการเผลอ highligh ข้อความ */
+        }
+        
+        /* --- Piece States --- */
+        .dragging {
+            opacity: 0.3;
+            transform: scale(1.1);
+            z-index: 100;
+            cursor: grabbing;
+            box-shadow: 0 10px 15px rgba(0,0,0,0.2);
+        }
+        
+        .drag-over {
+            transform: scale(0.95);
+            opacity: 0.7;
+        }
+        
+        /* สไตล์สำหรับกรอบเช็กคำตอบ */
+        .border-correct {
+            outline-color: #22c55e; /* green-500 */
+            box-shadow: 0 0 15px #22c55e;
+            z-index: 10;
+        }
+        .border-wrong {
+            outline-color: #ef4444; /* red-500 */
+            box-shadow: 0 0 15px #ef4444;
+            z-index: 10;
+        }
+        
+        /* สไตล์สำหรับ Modal Animation (Fade in & Zoom) */
+        #success-modal {
+            transition: opacity 0.3s ease-out;
+        }
+        #success-modal #modal-content {
+            transition: all 0.3s ease-out 0.1s;
+        }
+        
+        #success-modal.hidden {
+            opacity: 0;
+            pointer-events: none;
+        }
+        #success-modal.hidden #modal-content {
+            opacity: 0;
+            transform: scale(0.9);
+        }
+        
+        #success-modal:not(.hidden) {
+            opacity: 1;
+        }
+        #success-modal:not(.hidden) #modal-content {
+            opacity: 1;
+            transform: scale(1);
+        }
+
+    </style>
+</head>
+<body class="min-h-screen flex items-center justify-center p-4">
+
+    <main class="w-full max-w-6xl bg-white rounded-2xl shadow-2xl p-6 md:p-10">
+        
+        <!-- Header -->
+        <div class="text-center mb-8">
+            <h1 class="text-3xl md:text-4xl font-bold text-purple-600">RightCode Game Level 4</h1>
+            <!-- (ปรับแก้) เปลี่ยนชื่อแบบฝึกหัด -->
+            <p class="text-lg md:text-xl text-gray-700 mt-2">แบบฝึกหัด "เรียงตัวเลข"</p>
+            <p class="text-base text-gray-500 mt-4 max-w-2xl mx-auto">
+                ลากชิ้นส่วนตัวเลข (ขวา) เพื่อสลับตำแหน่งกัน
+                และเรียงให้ถูกต้อง 1-16 🔢
+            </p>
+        </div>
+
+        <div class="flex flex-col lg:flex-row justify-center items-center lg:items-start gap-8 md:gap-12">
+            
+            <!-- 1. Left Panel (Example & Controls) -->
+            <div class="flex flex-col items-center w-full lg:w-1/3">
+                <!-- (ปรับแก้) เปลี่ยนเป็น "เป้าหมาย" -->
+                <h3 class="text-2xl font-semibold text-gray-800 mb-4">เป้าหมาย</h3>
+                
+                <!-- (ปรับแก้) เปลี่ยนจาก #example-image เป็น #goal-description -->
+                <div id="goal-description" class="mb-6 p-6 bg-gray-100 rounded-lg text-center">
+                    <p class="text-lg text-gray-700 font-semibold">เรียงตัวเลข 1 ถึง 16</p>
+                    <p class="text-gray-500">(จากซ้ายไปขวา, บนลงล่าง)</p>
+                </div>
+
+
+                <!-- Controls -->
+                <div class="flex flex-col w-full max-w-xs gap-4">
+                    <button id="check-btn" class="w-full px-8 py-3 bg-blue-600 text-white font-semibold rounded-lg shadow-md hover:bg-blue-700 transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed">
+                        ตรวจสอบ
+                    </button>
+                    <button id="reset-btn" class="w-full px-8 py-3 bg-gray-500 text-white font-semibold rounded-lg shadow-md hover:bg-gray-600 transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-gray-400 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed">
+                        เริ่มใหม่ (สุ่มใหม่)
+                    </button>
+                </div>
+                
+                <div id="message" class="mt-6 text-2xl font-bold h-8">
+                    <!-- Messages (Success/Fail) -->
+                </div>
+            </div>
+
+            <!-- 2. Right Panel (Jigsaw Grid) -->
+            <div class="flex flex-col items-center">
+                 <h3 class="text-2xl font-semibold text-gray-800 mb-4">กระดานปริศนา (4x4)</h3>
+                <div id="jigsaw-grid" class="jigsaw-grid-container">
+                    <!-- JS จะสร้าง 16 .jigsaw-piece ที่นี่ -->
+                </div>
+                <p class="text-gray-500 text-sm mt-4 lg:hidden">
+                    (แตะ 2 ชิ้นเพื่อสลับที่)
+                </p>
+            </div>
+        </div>
+
+    </main>
+
+    <!-- Success Modal -->
+    <div id="success-modal" class="hidden fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center p-4 z-50">
+        <!-- Backdrop -->
+        <div class="absolute inset-0" id="modal-backdrop"></div>
+        
+        <div id="modal-content" class="relative bg-white rounded-2xl shadow-xl p-8 max-w-md w-full text-center">
+            <span class="text-8xl mb-6 block" role="img" aria-label="Party Popper">🥳</span>
+            <h2 class="text-3xl font-bold text-gray-900 mb-2">ยินดีด้วย!</h2>
+            <p class="text-lg text-gray-700 mb-8">คุณเรียงตัวเลขได้สมบูรณ์!</p>
+            <button id="play-again-btn" class="w-full px-8 py-4 bg-green-600 text-white font-semibold rounded-lg shadow-md hover:bg-green-700 transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 text-lg">
+                เล่นใหม่ (Level 4)
+            </button>
+        </div>
+    </div>
+    
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+
+            // --- องค์ประกอบ UI ---
+            const jigsawGrid = document.getElementById('jigsaw-grid');
+            // (ลบ) const exampleImage = document.getElementById('example-image');
+            const checkBtn = document.getElementById('check-btn');
+            const resetBtn = document.getElementById('reset-btn');
+            const messageEl = document.getElementById('message');
+            
+            const modal = document.getElementById('success-modal');
+            const modalBackdrop = document.getElementById('modal-backdrop');
+            const playAgainBtn = document.getElementById('play-again-btn');
+
+            // --- ตัวแปรเกม ---
+            const GRID_SIZE = 4; // 4x4
+            const TOTAL_PIECES = GRID_SIZE * GRID_SIZE;
+            
+            // (เพิ่ม) 16 สีที่แตกต่างกันสำหรับแต่ละช่อง
+            const TILE_COLORS = [
+                '#ef4444', '#f97316', '#eab308', '#84cc16', 
+                '#22c55e', '#14b8a6', '#06b6d4', '#0ea5e9',
+                '#3b82f6', '#6366f1', '#8b5cf6', '#a855f7', 
+                '#d946ef', '#ec4899', '#f43f5e', '#78716c'
+            ];
+            
+            // (ลบ) imageUrl
+            
+            let pieces = []; // Array เก็บข้อมูลชิ้นส่วน (ตัวเลข, สี)
+            
+            let draggedPiece = null;
+            let touchSelectedPiece = null; // สำหรับการสลับบนมือถือ
+
+            // --- ฟังก์ชันเริ่มต้นเกม ---
+            function initGame() {
+                modal.classList.add('hidden');
+                clearFeedback(); // ล้าง feedback เก่า
+                
+                checkBtn.disabled = false;
+                resetBtn.disabled = false;
+
+                // (ลบ) drawExampleGrid();
+
+                // 2. สร้าง Array ชิ้นส่วน (1-16)
+                pieces = [];
+                for (let i = 0; i < TOTAL_PIECES; i++) {
+                    pieces.push({
+                        number: i + 1, // ตัวเลข 1-16
+                        color: TILE_COLORS[i], // สีที่ถูกต้อง (จะไม่ถูกสลับ)
+                        // (ลบ) currentIndex และ correctIndex
+                    });
+                }
+
+                // 3. สลับตำแหน่ง (Shuffle) - (ปรับแก้) สลับ array โดยตรง
+                shufflePieces(pieces);
+
+                // 4. วาดชิ้นส่วนลงบนกระดาน
+                drawJigsawGrid();
+            }
+            
+            // (ลบ) drawExampleGrid()
+
+            // (ปรับแก้) ฟังก์ชันสลับ Array (Fisher-Yates)
+            function shufflePieces(array) {
+                for (let i = array.length - 1; i > 0; i--) {
+                    const j = Math.floor(Math.random() * (i + 1));
+                    [array[i], array[j]] = [array[j], array[i]];
+                }
+            }
+
+            // (ปรับแก้) ฟังก์ชันวาดกระดาน
+            function drawJigsawGrid() {
+                jigsawGrid.innerHTML = '';
+                
+                // (ปรับแก้) วาดตาม 'pieces' ที่ถูกสลับมา
+                pieces.forEach((pieceData, index) => {
+                    const pieceElement = document.createElement('div');
+                    pieceElement.className = 'jigsaw-piece';
+                    pieceElement.draggable = true;
+                    
+                    // (เพิ่ม) dataset.currentIndex คือ "ตำแหน่ง" บนกระดาน (0-15)
+                    pieceElement.dataset.currentIndex = index; 
+                    
+                    // (เพิ่ม) dataset.currentNumber คือ "ตัวเลข" ที่ช่องนี้ถืออยู่ (1-16)
+                    pieceElement.dataset.currentNumber = pieceData.number; 
+                    
+                    // (เพิ่ม) ใส่ตัวเลขและสี
+                    pieceElement.textContent = pieceData.number;
+                    // (ปรับแก้) สีจะอิงตาม "ตัวเลข" ไม่ใช่ตำแหน่ง
+                    pieceElement.style.backgroundColor = TILE_COLORS[pieceData.number - 1]; 
+                    
+                    // (ลบ) ลบโค้ด background-image/position ทั้งหมด
+                    
+                    // เพิ่ม Event Listeners
+                    addPieceListeners(pieceElement);
+                    
+                    jigsawGrid.appendChild(pieceElement);
+                });
+            }
+
+            // --- Event Listeners (Drag & Drop) ---
+            
+            function addPieceListeners(piece) {
+                // Mouse Events
+                piece.addEventListener('dragstart', handleDragStart);
+                piece.addEventListener('dragend', handleDragEnd);
+                piece.addEventListener('dragover', handleDragOver);
+                piece.addEventListener('dragenter', handleDragEnter);
+                piece.addEventListener('dragleave', handleDragLeave);
+                piece.addEventListener('drop', handleDrop);
+                
+                // Touch Events
+                piece.addEventListener('touchstart', handleTouchStart, { passive: false });
+            }
+
+            // --- Handlers: การลาก (Mouse) ---
+            
+            function handleDragStart(e) {
+                clearFeedback(); 
+                draggedPiece = this;
+                this.classList.add('dragging');
+                e.dataTransfer.effectAllowed = 'move';
+                // (ไม่เปลี่ยนแปลง) ใช้ currentIndex (ตำแหน่ง 0-15) เป็น ID
+                e.dataTransfer.setData('text/plain', this.dataset.currentIndex); 
+                setTimeout(() => this.style.opacity = '0.3', 0);
+            }
+
+            function handleDragEnd() {
+                this.classList.remove('dragging');
+                this.style.opacity = '1';
+                draggedPiece = null;
+                document.querySelectorAll('.drag-over').forEach(p => p.classList.remove('drag-over'));
+            }
+
+            function handleDragOver(e) {
+                e.preventDefault(); 
+                e.dataTransfer.dropEffect = 'move';
+            }
+
+            function handleDragEnter(e) {
+                e.preventDefault();
+                if (this !== draggedPiece) {
+                    this.classList.add('drag-over');
+                }
+            }
+
+            function handleDragLeave(e) {
+                this.classList.remove('drag-over');
+            }
+
+            function handleDrop(e) {
+                e.preventDefault();
+                e.stopPropagation(); 
+                
+                if (draggedPiece === null || this === draggedPiece) {
+                    this.classList.remove('drag-over');
+                    return; 
+                }
+                
+                swapPieces(draggedPiece, this);
+                
+                this.classList.remove('drag-over');
+            }
+            
+            // --- Handlers: การแตะ (Touch) ---
+            function handleTouchStart(e) {
+                e.preventDefault();
+                clearFeedback(); 
+
+                if (touchSelectedPiece === null) {
+                    touchSelectedPiece = this;
+                    this.classList.add('dragging');
+                    
+                    setTimeout(() => {
+                        if (touchSelectedPiece === this) {
+                            touchSelectedPiece.classList.remove('dragging');
+                            touchSelectedPiece = null;
+                        }
+                    }, 2000); 
+                    
+                } else {
+                    if (this === touchSelectedPiece) {
+                        touchSelectedPiece.classList.remove('dragging');
+                        touchSelectedPiece = null;
+                    } else {
+                        touchSelectedPiece.classList.remove('dragging'); 
+                        swapPieces(touchSelectedPiece, this); 
+                        touchSelectedPiece = null; 
+                    }
+                }
+            }
+            
+            // (ปรับแก้) ฟังก์ชันหลัก: สลับชิ้นส่วน ---
+            function swapPieces(pieceA, pieceB) {
+                
+                // 1. สลับ Text Content (ตัวเลขที่แสดง)
+                const textA = pieceA.textContent;
+                pieceA.textContent = pieceB.textContent;
+                pieceB.textContent = textA;
+                
+                // 2. สลับ Background Color
+                const colorA = pieceA.style.backgroundColor;
+                pieceA.style.backgroundColor = pieceB.style.backgroundColor;
+                pieceB.style.backgroundColor = colorA;
+
+                // 3. สลับ Data Attribute (สำคัญมากสำหรับการตรวจสอบ)
+                const numberA = pieceA.dataset.currentNumber;
+                pieceA.dataset.currentNumber = pieceB.dataset.currentNumber;
+                pieceB.dataset.currentNumber = numberA;
+                
+                // ล้างกรอบ (ถ้ามี)
+                clearFeedback();
+            }
+
+            // --- ฟังก์ชันตรวจสอบและรีเซ็ต ---
+            
+            function clearFeedback() {
+                messageEl.textContent = '';
+                document.querySelectorAll('.jigsaw-piece').forEach(p => {
+                    p.classList.remove('border-correct', 'border-wrong');
+                });
+            }
+            
+            // (ปรับแก้) ฟังก์ชันตรวจสอบ
+            function checkAnswer() {
+                checkBtn.disabled = true; // ปิดปุ่มชั่วคราวขณะตรวจสอบ
+                
+                let allCorrect = true;
+                
+                jigsawGrid.querySelectorAll('.jigsaw-piece').forEach(piece => {
+                    // ตำแหน่งบนกระดาน (0-15)
+                    const currentIndex = parseInt(piece.dataset.currentIndex, 10); 
+                    // ตัวเลขที่ช่องนี้ถืออยู่ (1-16)
+                    const currentNumber = parseInt(piece.dataset.currentNumber, 10); 
+                    
+                    // เป้าหมาย: ตัวเลขที่ถืออยู่ (currentNumber)
+                    // ต้องตรงกับ ตำแหน่งบนกระดาน + 1 (currentIndex + 1)
+                    if (currentNumber === (currentIndex + 1)) {
+                        piece.classList.add('border-correct');
+                    } else {
+                        piece.classList.add('border-wrong');
+                        allCorrect = false;
+                    }
+                });
+
+                if (allCorrect) {
+                    messageEl.textContent = 'ยอดเยี่ยม! 🥳';
+                    messageEl.className = 'mt-6 text-2xl font-bold h-8 text-green-600';
+                    modal.classList.remove('hidden');
+                    checkBtn.disabled = true; 
+                } else {
+                    messageEl.textContent = 'โอ๊ะ! ยังไม่ถูกต้อง 😢';
+                    messageEl.className = 'mt-6 text-2xl font-bold h-8 text-red-600';
+                    checkBtn.disabled = false; 
+                }
+            }
+
+            // --- เชื่อมต่อปุ่ม ---
+            checkBtn.addEventListener('click', checkAnswer);
+            resetBtn.addEventListener('click', initGame);
+            playAgainBtn.addEventListener('click', initGame);
+            modalBackdrop.addEventListener('click', () => modal.classList.add('hidden'));
+
+            // --- เริ่มเกมครั้งแรก ---
+            initGame();
+        });
+    </script>
+
+</body>
+</html>
+
